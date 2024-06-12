@@ -1,7 +1,8 @@
-use super::cell::Cell;
+use super::cell::{Cell, CellState};
+use rand::prelude::*;
 
 pub struct Game {
-    cells: Vec<Vec<Option<Cell>>>,
+    pub cells: Vec<Vec<Option<Cell>>>,
     gen_num: u32
 }
 
@@ -12,7 +13,13 @@ impl Game {
             for j in 0..size_y {
                 let cell = Cell::new(i as u32, j as u32);
                 cells[i][j] = Some(cell);
+                let mut rng = rand::thread_rng();
+
+                if rng.gen::<f64>() > 0.5 {
+                    cells[i][j].as_mut().map(|inner| inner.state = CellState::Alive);
+                }
             }
+            
         }
         
         return Game {

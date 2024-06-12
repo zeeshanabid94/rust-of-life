@@ -9,8 +9,8 @@ pub enum CellState {
 // Represent a single cell on the board.
 #[derive(Debug, Clone)]
 pub struct Cell {
-    state: CellState,
-    pos: (u32, u32)
+    pub state: CellState,
+    pub pos: (u32, u32)
 }
 
 impl Cell {
@@ -29,11 +29,11 @@ impl Cell {
         self.state = CellState::Alive;
     }
 
-    pub fn x(self) -> u32 {
+    pub fn x(&self) -> u32 {
         self.pos.0
     }
 
-    pub fn y(self) -> u32 {
+    pub fn y(&self) -> u32 {
         self.pos.1
     }
 }
