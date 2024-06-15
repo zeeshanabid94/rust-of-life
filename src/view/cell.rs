@@ -3,6 +3,7 @@ use cursive::{
     view::IntoBoxedView,
     View, With,
 };
+use tracing::debug;
 
 use crate::state::{
     cell::CellState,
@@ -11,8 +12,10 @@ use crate::state::{
 
 impl View for GameRef {
     fn draw(&self, printer: &cursive::Printer) {
+        debug!("Drawing board.");
+        let cloned_self = self.clone();
         let offset_printer = printer.offset((5, 5));
-        for cell in self.0.borrow().cells.iter().flatten() {
+        for cell in cloned_self.0.borrow().cells.iter().flatten() {
             cell.as_ref().map(|inner| {
                 offset_printer.print(
                     (inner.x(), inner.y()),
