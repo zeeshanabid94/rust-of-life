@@ -24,7 +24,7 @@ fn main() {
     info!("Starting rust of life!");
 
     let mut cursive_ref = Cursive::new();
-    let game = Game::randomized_board(150, 30);
+    let game = Game::randomized_board(200, 30);
 
     cursive_ref.add_layer(GameRef(Rc::new(RefCell::new(game))));
     cursive_ref.set_window_title("Rust of Life");
