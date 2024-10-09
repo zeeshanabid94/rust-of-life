@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use super::cell::{Cell, CellState};
 use rand::prelude::*;
+use tokio::sync::mpsc::Sender;
 use tracing::{info, debug};
 
 const TICK_RATE_PER_SECOND: f64 = 15.0;
@@ -11,6 +12,7 @@ pub struct Game {
     pub size_x: isize,
     pub size_y: isize,
     pub cells: Vec<Vec<Option<Cell>>>,
+    sender: Option<Sender<Vec<Vec<Option<Cell>>>>>,
     gen_num: u32,
 }
 
@@ -18,6 +20,13 @@ pub struct Game {
 pub struct GameRef(pub Rc<RefCell<Game>>);
 
 impl Game {
+
+    pub fn with_sender(mut self, tx: Sender<Vec<Vec<Option<Cell>>>>) -> Self {
+        self.sender = Some(tx);
+
+        self
+    }
+
     pub fn randomized_board(size_x: isize, size_y: isize) -> Self {
         let mut cells = vec![vec![None; size_y as usize]; size_x as usize];
         info!("Creating a randomized board.");
@@ -35,14 +44,27 @@ impl Game {
             }
         }
 
-        return Game { size_x, size_y, cells, gen_num: 0 };
+        return Game { size_x, size_y, cells, gen_num: 0, sender: None };
     }
 
     pub async fn start(mut self) {        
+        let cloned_cells = self.cells.clone();
+
+        if let Some(sender) = self.sender.clone() {
+            let _ = sender.send(cloned_cells).await;
+        }
+
         loop {
             let tick_time: f64 = 1.0 / TICK_RATE_PER_SECOND * 1000.0;
             tokio::time::sleep(Duration::from_millis(tick_time as u64)).await;
             self.tick();
+
+            let cloned_cells = self.cells.clone();
+
+            if let Some(sender) = self.sender.clone() {
+                let _ = sender.send(cloned_cells).await;
+            }
+            
         }
     }
 

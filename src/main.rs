@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, str::FromStr};
 
-use cursive::{event, views::{Button, Canvas, DebugView, FixedLayout, LinearLayout, PaddedView}, Cursive, CursiveExt, Rect};
+use cursive::{event, views::{Button, Canvas, DebugView, FixedLayout, LinearLayout, PaddedView, Panel}, Cursive, CursiveExt, Rect};
 use rust_of_life::state::{cell::{Cell, CellState}, game::{Game, GameRef}};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -17,7 +17,7 @@ async fn main() {
     
     // Use the tracing_subscriber crate to consume the logs and pipe them to the file
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(Level::INFO)
         .with_writer(non_blocking)
         .finish();
 
@@ -25,30 +25,43 @@ async fn main() {
         .expect("setting default subscriber failed");
 
     info!("Starting rust of life!");
-    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<Vec<Option<Cell>>>>(100);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<Vec<Option<Cell>>>>(100);
 
     let mut cursive_ref = Cursive::new();
-    let game = Game::randomized_board(50, 30);
-    let canvas = PaddedView::lrtb(OFFSET_X, OFFSET_X, OFFSET_Y, OFFSET_Y, Canvas::new(GameRef(Rc::new(RefCell::new(game))))
+    let game = Game::randomized_board(50, 30).with_sender(tx);
+
+    tokio::spawn(async move {
+        tracing::info!("Starting game simulation.");
+        game.start().await;
+    });
+    let canvas = PaddedView::lrtb(OFFSET_X, OFFSET_X, OFFSET_Y, OFFSET_Y, 
+        Panel::new(Canvas::new(RefCell::new(rx))
         .with_required_size(|state, screen_size| {
-            // Take up as much as the board size + 2 times the padding of x and y
-            cursive::Vec2::new(state.0.borrow().size_x.unsigned_abs(), state.0.borrow().size_y.unsigned_abs())
+            // TODO: Figure out a better way to get size
+            cursive::Vec2::new(50, 30)
         })
         .with_draw(|state, printer| {
-            tracing::debug!("Drawing board.");
-            let cloned_self = state.clone();
-            for cell in cloned_self.0.borrow().cells.iter().flatten() {
-                cell.as_ref().map(|inner| {
-                    printer.print(
-                        (inner.x(), inner.y()),
-                        match inner.state {
-                            CellState::Alive => "A",
-                            CellState::Dead => "_",
-                        },
-                    )
-                });
+            let board = state.borrow_mut().try_recv();
+
+            if let Ok(board) = board {
+                tracing::debug!("Drawing board.");
+                let cloned_self = state.clone();
+                for cell in board.iter().flatten() {
+                    cell.as_ref().map(|inner| {
+                        printer.print(
+                            (inner.x(), inner.y()),
+                            match inner.state {
+                                CellState::Alive => "A",
+                                CellState::Dead => "_",
+                            },
+                        )
+                    });
+                }
             }
-        }));
+        })
+        .with_needs_relayout(|state| {
+            !state.borrow().is_empty()
+        })));
     let controls = LinearLayout::vertical()
         .child(PaddedView::lrtb(
                 OFFSET_X, OFFSET_X, OFFSET_Y, OFFSET_Y, 
@@ -68,6 +81,7 @@ async fn main() {
     cursive_ref.add_global_callback('~', Cursive::toggle_debug_console);
     cursive_ref.add_global_callback('q', |cur_ref| cur_ref.quit());
     cursive_ref.set_autorefresh(true);
+    cursive_ref.set_fps(10);
    
     cursive_ref.run();
 }
