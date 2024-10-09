@@ -37,11 +37,17 @@ impl View for GameRef {
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
-        self.0.borrow_mut().tick();
         let cloned_self = self.clone();
         match event {
+            Event::Char(char) => {
+                if char == 'r' {
+                    EventResult::with_cb(move |cur| cur.add_layer(cloned_self.to_owned()));
+                }
+                EventResult::Ignored
+            }
             Event::Refresh => {
-                EventResult::with_cb(move |cur| cur.add_layer(cloned_self.to_owned()))
+                EventResult::Ignored
+                // EventResult::with_cb(move |cur| cur.add_layer(cloned_self.to_owned()))
             }
             _ => EventResult::Ignored,
         }

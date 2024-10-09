@@ -1,8 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use super::cell::{Cell, CellState};
 use rand::prelude::*;
 use tracing::{info, debug};
+
+const TICK_RATE_PER_SECOND: f64 = 15.0;
 
 #[derive(Clone, Debug)]
 pub struct Game {
@@ -36,7 +38,15 @@ impl Game {
         return Game { size_x, size_y, cells, gen_num: 0 };
     }
 
-    pub fn tick(&mut self) {
+    pub async fn start(mut self) {        
+        loop {
+            let tick_time: f64 = 1.0 / TICK_RATE_PER_SECOND * 1000.0;
+            tokio::time::sleep(Duration::from_millis(tick_time as u64)).await;
+            self.tick();
+        }
+    }
+
+    fn tick(&mut self) {
         debug!("Ticking simulation.");
         let cloned_cells = self.cells.clone();
 
