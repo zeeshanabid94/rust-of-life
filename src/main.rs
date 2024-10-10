@@ -9,10 +9,10 @@ use tracing_appender::rolling::{RollingFileAppender, Rotation};
 const OFFSET_X: usize = 5;
 const OFFSET_Y: usize = 5;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
     // Create a rolling file appender that rotates logs every hour and writes to ./logs/my_log.log
-    let file_appender = RollingFileAppender::new(Rotation::HOURLY, "./logs", "rust-of-life.log");
+    let file_appender = RollingFileAppender::new(Rotation::MINUTELY, "./logs", "rust-of-life.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     
     // Use the tracing_subscriber crate to consume the logs and pipe them to the file
@@ -29,7 +29,7 @@ async fn main() {
     let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();
-    let game = Game::randomized_board(50, 30).with_sender(tx);
+    let game = Game::randomized_board(50, 30).with_sender(tx).with_control_rx(controls_rx);
 
     tokio::spawn(async move {
         tracing::info!("Starting game simulation.");

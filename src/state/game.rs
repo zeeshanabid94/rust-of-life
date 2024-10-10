@@ -3,14 +3,13 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use crate::view::ui::ControlMessages;
 
 use super::cell::{Cell, CellState};
-use cursive::reexports::crossbeam_channel::Receiver;
 use rand::prelude::*;
-use tokio::sync::mpsc::Sender;
-use tracing::{info, debug};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 15.0;
+const TICK_RATE_PER_SECOND: f64 = 1.0;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Game {
     pub size_x: isize,
     pub size_y: isize,
@@ -18,13 +17,13 @@ pub struct Game {
     sender: Option<Sender<Vec<Vec<Option<Cell>>>>>,
     control_rx: Option<Receiver<ControlMessages>>,
     gen_num: u32,
+    running: bool,
 }
 
 #[derive(Clone)]
 pub struct GameRef(pub Rc<RefCell<Game>>);
 
 impl Game {
-
     pub fn with_sender(mut self, tx: Sender<Vec<Vec<Option<Cell>>>>) -> Self {
         self.sender = Some(tx);
 
@@ -54,27 +53,49 @@ impl Game {
             }
         }
 
-        return Game { size_x, size_y, cells, gen_num: 0, sender: None, control_rx: None};
+        return Game {
+            size_x,
+            size_y,
+            cells,
+            gen_num: 0,
+            sender: None,
+            control_rx: None,
+            running: false,
+        };
     }
 
-    pub async fn start(mut self) {        
+    pub async fn start(mut self) {
+        self.running = true;
         let cloned_cells = self.cells.clone();
 
         if let Some(sender) = self.sender.clone() {
-            let _ = sender.send(cloned_cells).await;
+            let _ = sender.try_send(cloned_cells);
         }
 
         loop {
-            let tick_time: f64 = 1.0 / TICK_RATE_PER_SECOND * 1000.0;
-            tokio::time::sleep(Duration::from_millis(tick_time as u64)).await;
-            self.tick();
-
             let cloned_cells = self.cells.clone();
 
             if let Some(sender) = self.sender.clone() {
-                let _ = sender.send(cloned_cells).await;
+                let _ = sender.try_send(cloned_cells);
             }
-            
+            if self.running {
+                tracing::debug!("Simulation running");
+                let tick_time: f64 = (1.0 / TICK_RATE_PER_SECOND) * 1000.0;
+                tokio::time::sleep(Duration::from_millis(tick_time as u64)).await;
+                self.tick();
+            }
+
+            if let Some(controls_tx) = self.control_rx.as_mut() {
+                let control_message = controls_tx.try_recv();
+
+                if let Ok(control_message) = control_message {
+                    tracing::info!("Control message received: {:?}", control_message);
+                    match control_message {
+                        ControlMessages::Stop => self.running = false,
+                        ControlMessages::Start => self.running = true,
+                    }
+                }
+            }
         }
     }
 
@@ -98,17 +119,21 @@ impl Game {
                             debug!("Y is out of bounds. Y: {}", neighbor_j);
                             continue;
                         }
-                        cloned_cells[neighbor_i as usize][neighbor_j as usize].as_ref().map(|inner| {
-                            if let CellState::Alive = inner.state {
-                                alive_count += 1;
-                            }
-                        });
+                        cloned_cells[neighbor_i as usize][neighbor_j as usize]
+                            .as_ref()
+                            .map(|inner| {
+                                if let CellState::Alive = inner.state {
+                                    alive_count += 1;
+                                }
+                            });
                     }
                 }
 
                 debug!("Updating cell state.");
 
-                if let CellState::Alive = cell.as_ref().map_or(&CellState::Dead, |inner| &inner.state) {
+                if let CellState::Alive =
+                    cell.as_ref().map_or(&CellState::Dead, |inner| &inner.state)
+                {
                     if alive_count < 2 || alive_count > 3 {
                         cell.as_mut().map(|inner| inner.state = CellState::Dead);
                     }

@@ -1,8 +1,7 @@
 use std::cell::RefCell;
 
 use cursive::{
-    views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel},
-    View,
+    view::Nameable, views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel}, View
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -11,9 +10,15 @@ use crate::state::cell::{Cell, CellState};
 const OFFSET_X: usize = 5;
 const OFFSET_Y: usize = 5;
 
+#[derive(Debug)]
 pub enum ControlMessages {
     Start,
     Stop,
+}
+
+#[derive(Debug)]
+struct UserInterfaceData {
+    running: bool,
 }
 
 pub struct UserInterface {
@@ -55,7 +60,6 @@ impl UserInterface {
                             }
                         }
                     })
-                    .with_needs_relayout(|state| !state.borrow().is_empty()),
             ),
         ));
 
@@ -67,14 +71,55 @@ impl UserInterface {
             Button::new("Start", {
                 let cloned_tx = controls_tx.clone();
                 move |_s| {
-                    if let Err(error) = cloned_tx.blocking_send(ControlMessages::Start) {
-                        tracing::error!(
-                            "Unable to send start message on controls sender channel. {:?}",
-                            error
-                        );
+                    tracing::info!("Start/Stop button pressed.");
+                    if let Some(user_data) = _s.user_data::<UserInterfaceData>() {
+                        tracing::info!("Read user data {:?}", user_data);
+                        if user_data.running {
+                            if let Err(error) = cloned_tx.try_send(ControlMessages::Stop) {
+                                tracing::error!(
+                                    "Unable to send stop message on controls sender channel. {:?}",
+                                    error
+                                );
+                            } else {
+                                _s.set_user_data(UserInterfaceData { running: false });
+                            }
+                        } else {
+                            if let Err(error) = cloned_tx.try_send(ControlMessages::Start) {
+                                tracing::error!(
+                                    "Unable to send start message on controls sender channel. {:?}",
+                                    error
+                                );
+                            } else {
+                                _s.set_user_data(UserInterfaceData { running: true });
+                            }
+                        }
+                    } else {
+                        if let Err(error) = cloned_tx.try_send(ControlMessages::Start) {
+                            
+                            tracing::error!(
+                                "Unable to send start message on controls sender channel. {:?}",
+                                error
+                            );
+                        } else {
+                            _s.set_user_data(UserInterfaceData { running: true });
+                        }
                     }
+                    
+                    if let Some(user_data) = _s.user_data::<UserInterfaceData>() {
+                        if user_data.running {
+                            _s.call_on_name("Start/Stop", |view: &mut Button| {
+                                view.set_label("Stop");
+                            });
+                        } else {
+                            _s.call_on_name("Start/Stop", |view: &mut Button| {
+                        view.set_label("Start");
+                    });
+                        }
+                    }
+                    
                 }
-            }),
+            })
+            .with_name("Start/Stop"),
         )));
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 
