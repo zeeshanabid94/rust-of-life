@@ -1,26 +1,37 @@
 use std::cell::RefCell;
 
-use cursive::{views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel}, View};
-use tokio::sync::mpsc::Receiver;
+use cursive::{
+    views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel},
+    View,
+};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::state::cell::{Cell, CellState};
 
 const OFFSET_X: usize = 5;
 const OFFSET_Y: usize = 5;
 
+pub enum ControlMessages {
+    Start,
+    Stop,
+}
+
 pub struct UserInterface {
-    pub root: BoxedView
+    pub root: BoxedView,
 }
 
 impl UserInterface {
-    pub fn init(rx: Receiver<Vec<Vec<Option<Cell>>>>) -> Self {
+    pub fn init(
+        model_rx: Receiver<Vec<Vec<Option<Cell>>>>,
+        controls_tx: Sender<ControlMessages>,
+    ) -> Self {
         let canvas = BoxedView::boxed(PaddedView::lrtb(
             OFFSET_X,
             OFFSET_X,
             OFFSET_Y,
             OFFSET_Y,
             Panel::new(
-                Canvas::new(RefCell::new(rx))
+                Canvas::new(RefCell::new(model_rx))
                     .with_required_size(|state, screen_size| {
                         // TODO: Figure out a better way to get size
                         cursive::Vec2::new(50, 30)
@@ -53,13 +64,20 @@ impl UserInterface {
             OFFSET_X,
             OFFSET_Y,
             OFFSET_Y,
-            Button::new("Start", |s| s.quit()),
+            Button::new("Start", {
+                let cloned_tx = controls_tx.clone();
+                move |_s| {
+                    if let Err(error) = cloned_tx.blocking_send(ControlMessages::Start) {
+                        tracing::error!(
+                            "Unable to send start message on controls sender channel. {:?}",
+                            error
+                        );
+                    }
+                }
+            }),
         )));
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 
-        Self {
-            root: layout
-        }
+        Self { root: layout }
     }
 }
-

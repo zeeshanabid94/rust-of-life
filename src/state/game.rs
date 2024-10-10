@@ -1,6 +1,9 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
+use crate::view::ui::ControlMessages;
+
 use super::cell::{Cell, CellState};
+use cursive::reexports::crossbeam_channel::Receiver;
 use rand::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tracing::{info, debug};
@@ -13,6 +16,7 @@ pub struct Game {
     pub size_y: isize,
     pub cells: Vec<Vec<Option<Cell>>>,
     sender: Option<Sender<Vec<Vec<Option<Cell>>>>>,
+    control_rx: Option<Receiver<ControlMessages>>,
     gen_num: u32,
 }
 
@@ -23,6 +27,12 @@ impl Game {
 
     pub fn with_sender(mut self, tx: Sender<Vec<Vec<Option<Cell>>>>) -> Self {
         self.sender = Some(tx);
+
+        self
+    }
+
+    pub fn with_control_rx(mut self, rx: Receiver<ControlMessages>) -> Self {
+        self.control_rx = Some(rx);
 
         self
     }
@@ -44,7 +54,7 @@ impl Game {
             }
         }
 
-        return Game { size_x, size_y, cells, gen_num: 0, sender: None };
+        return Game { size_x, size_y, cells, gen_num: 0, sender: None, control_rx: None};
     }
 
     pub async fn start(mut self) {        

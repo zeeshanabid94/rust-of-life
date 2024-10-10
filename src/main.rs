@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, str::FromStr};
 
 use cursive::{event, views::{Button, Canvas, DebugView, FixedLayout, LinearLayout, PaddedView, Panel}, Cursive, CursiveExt, Rect};
-use rust_of_life::{state::{cell::{Cell, CellState}, game::{Game, GameRef}}, view::ui::UserInterface};
+use rust_of_life::{state::{cell::{Cell, CellState}, game::{Game, GameRef}}, view::ui::{ControlMessages, UserInterface}};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -26,6 +26,7 @@ async fn main() {
 
     info!("Starting rust of life!");
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<Vec<Option<Cell>>>>(100);
+    let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();
     let game = Game::randomized_board(50, 30).with_sender(tx);
@@ -35,7 +36,7 @@ async fn main() {
         game.start().await;
     });
     
-    cursive_ref.add_layer(UserInterface::init(rx).root);
+    cursive_ref.add_layer(UserInterface::init(rx, controls_tx).root);
 
     // cursive_ref.add_layer(GameRef(Rc::new(RefCell::new(game))));
     cursive_ref.set_window_title("Rust of Life");
