@@ -17,7 +17,6 @@ pub struct Game {
     pub cells: Vec<Vec<Option<Cell>>>,
     sender: Option<Sender<Vec<Vec<Option<Cell>>>>>,
     control_rx: Option<Receiver<ControlMessages>>,
-    gen_num: u32,
     running: bool,
 }
 
@@ -54,15 +53,14 @@ impl Game {
             }
         }
 
-        return Game {
+        Game {
             size_x,
             size_y,
             cells,
-            gen_num: 0,
             sender: None,
             control_rx: None,
             running: false,
-        };
+        }
     }
 
     pub async fn start(mut self) {
@@ -134,13 +132,11 @@ impl Game {
                 if let CellState::Alive =
                     cell.as_ref().map_or(&CellState::Dead, |inner| &inner.state)
                 {
-                    if alive_count < 2 || alive_count > 3 {
+                    if !(2..=3).contains(&alive_count) {
                         cell.as_mut().map(|inner| inner.state = CellState::Dead);
                     }
-                } else {
-                    if alive_count == 3 {
-                        cell.as_mut().map(|inner| inner.state = CellState::Alive);
-                    }
+                } else if alive_count == 3 {
+                    cell.as_mut().map(|inner| inner.state = CellState::Alive);
                 }
             })
         });

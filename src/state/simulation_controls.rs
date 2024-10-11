@@ -1,3 +1,3 @@
 pub struct SimulationControls {
-    pub ticking: bool
+    pub ticking: bool,
 }

@@ -3,21 +3,21 @@
 #[derive(Debug, Clone)]
 pub enum CellState {
     Alive,
-    Dead
+    Dead,
 }
 
 // Represent a single cell on the board.
 #[derive(Debug, Clone)]
 pub struct Cell {
     pub state: CellState,
-    pub pos: (u32, u32)
+    pub pos: (u32, u32),
 }
 
 impl Cell {
-    pub fn new(x: u32, y:u32) -> Cell {
+    pub fn new(x: u32, y: u32) -> Cell {
         Cell {
             state: CellState::Dead,
-            pos: (x, y)
+            pos: (x, y),
         }
     }
 
