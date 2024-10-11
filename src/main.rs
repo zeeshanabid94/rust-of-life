@@ -25,7 +25,7 @@ async fn main() {
         .expect("setting default subscriber failed");
 
     info!("Starting rust of life!");
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<Vec<Option<Cell>>>>(100);
+    let (tx, mut rx) = tokio::sync::watch::channel::<Vec<Vec<Option<Cell>>>>(vec![]);
     let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();

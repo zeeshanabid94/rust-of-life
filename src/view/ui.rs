@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 
 use cursive::{
-    view::Nameable, views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel}, View
+    view::{Nameable, Resizable}, views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel}, View
 };
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
+use tokio::sync::watch::Receiver;
 
 use crate::state::cell::{Cell, CellState};
 
@@ -42,11 +43,10 @@ impl UserInterface {
                         cursive::Vec2::new(50, 30)
                     })
                     .with_draw(|state, printer| {
-                        let board = state.borrow_mut().try_recv();
+                        let rx = state.borrow_mut();
+                        let board = rx.borrow();
 
-                        if let Ok(board) = board {
                             tracing::debug!("Drawing board.");
-                            let cloned_self = state.clone();
                             for cell in board.iter().flatten() {
                                 cell.as_ref().map(|inner| {
                                     printer.print(
@@ -57,7 +57,6 @@ impl UserInterface {
                                         },
                                     )
                                 });
-                            }
                         }
                     })
             ),
@@ -119,7 +118,8 @@ impl UserInterface {
                     
                 }
             })
-            .with_name("Start/Stop"),
+            .with_name("Start/Stop")
+                .fixed_width(10)
         )));
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 

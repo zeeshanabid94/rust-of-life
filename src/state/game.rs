@@ -4,10 +4,11 @@ use crate::view::ui::ControlMessages;
 
 use super::cell::{Cell, CellState};
 use rand::prelude::*;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 1.0;
+const TICK_RATE_PER_SECOND: f64 = 5.0;
 
 #[derive(Debug)]
 pub struct Game {
@@ -65,18 +66,17 @@ impl Game {
     }
 
     pub async fn start(mut self) {
-        self.running = true;
         let cloned_cells = self.cells.clone();
 
         if let Some(sender) = self.sender.clone() {
-            let _ = sender.try_send(cloned_cells);
+            let _ = sender.send(cloned_cells);
         }
 
         loop {
             let cloned_cells = self.cells.clone();
 
             if let Some(sender) = self.sender.clone() {
-                let _ = sender.try_send(cloned_cells);
+                let _ = sender.send(cloned_cells);
             }
             if self.running {
                 tracing::debug!("Simulation running");
