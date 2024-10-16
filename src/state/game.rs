@@ -8,23 +8,29 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 5.0;
+const TICK_RATE_PER_SECOND: f64 = 10.0;
+type Board = Vec<Vec<Option<Cell>>>;
+
+#[derive(Debug, Clone, Default)]
+pub struct GameData {
+    pub running: bool,
+    pub cells: Board 
+}
 
 #[derive(Debug)]
 pub struct Game {
     pub size_x: isize,
     pub size_y: isize,
-    pub cells: Vec<Vec<Option<Cell>>>,
-    sender: Option<Sender<Vec<Vec<Option<Cell>>>>>,
+    sender: Option<Sender<GameData>>,
     control_rx: Option<Receiver<ControlMessages>>,
-    running: bool,
+    game_data: Box<GameData>
 }
 
 #[derive(Clone)]
 pub struct GameRef(pub Rc<RefCell<Game>>);
 
 impl Game {
-    pub fn with_sender(mut self, tx: Sender<Vec<Vec<Option<Cell>>>>) -> Self {
+    pub fn with_sender(mut self, tx: Sender<GameData>) -> Self {
         self.sender = Some(tx);
 
         self
@@ -36,11 +42,11 @@ impl Game {
         self
     }
 
-    pub fn randomized_board(size_x: isize, size_y: isize) -> Self {
-        let mut cells = vec![vec![None; size_y as usize]; size_x as usize];
+    fn randomize(&mut self) {
+        let mut cells = vec![vec![None; self.size_y as usize]; self.size_x as usize];
         info!("Creating a randomized board.");
-        for x in 0_usize..size_x as usize {
-            for y in 0_usize..size_y as usize {
+        for x in 0..self.size_x as usize {
+            for y in 0..self.size_y as usize {
                 let cell = Cell::new(x as u32, y as u32);
                 cells[x][y] = Some(cell);
                 let mut rng = rand::thread_rng();
@@ -53,30 +59,46 @@ impl Game {
             }
         }
 
-        Game {
+        // Overwrite existing cell data
+        self.game_data.cells = cells;
+    }
+
+    pub fn randomized_board(size_x: isize, size_y: isize) -> Self {
+        let mut cells = vec![vec![None; size_y as usize]; size_x as usize];
+        info!("Creating a randomized board.");
+        for x in 0_usize..size_x as usize {
+            for y in 0_usize..size_y as usize {
+                let cell = Cell::new(x as u32, y as u32);
+                cells[x][y] = Some(cell);
+            }
+        }
+
+        let mut init = Game {
             size_x,
             size_y,
-            cells,
             sender: None,
             control_rx: None,
-            running: false,
-        }
+            game_data: Box::new(GameData {
+                running: false,
+                cells
+            })
+        };
+
+        init.randomize();
+
+        init
     }
 
     pub async fn start(mut self) {
-        let cloned_cells = self.cells.clone();
-
         if let Some(sender) = self.sender.clone() {
-            let _ = sender.send(cloned_cells);
+            let _ = sender.send(*self.game_data.clone());
         }
 
         loop {
-            let cloned_cells = self.cells.clone();
-
             if let Some(sender) = self.sender.clone() {
-                let _ = sender.send(cloned_cells);
+                let _ = sender.send(*self.game_data.clone());
             }
-            if self.running {
+            if self.game_data.running {
                 tracing::debug!("Simulation running");
                 let tick_time: f64 = (1.0 / TICK_RATE_PER_SECOND) * 1000.0;
                 tokio::time::sleep(Duration::from_millis(tick_time as u64)).await;
@@ -89,19 +111,25 @@ impl Game {
                 if let Ok(control_message) = control_message {
                     tracing::info!("Control message received: {:?}", control_message);
                     match control_message {
-                        ControlMessages::Stop => self.running = false,
-                        ControlMessages::Start => self.running = true,
+                        ControlMessages::Stop => self.game_data.running = false,
+                        ControlMessages::Start => self.game_data.running = true,
+                        ControlMessages::Reset => self.reset(),
                     }
                 }
             }
         }
     }
 
+    fn reset(&mut self) {
+        self.game_data.running = false; // Stop running
+        self.randomize();
+    }
+
     fn tick(&mut self) {
         debug!("Ticking simulation.");
-        let cloned_cells = self.cells.clone();
+        let cloned_cells = self.game_data.cells.clone();
 
-        self.cells.iter_mut().enumerate().for_each(|(i, column)| {
+        self.game_data.cells.iter_mut().enumerate().for_each(|(i, column)| {
             column.iter_mut().enumerate().for_each(|(j, cell)| {
                 let mut alive_count = 0;
                 for delta_i in -1_isize..=1 {

@@ -5,7 +5,7 @@ use cursive::{
 use rust_of_life::{
     state::{
         cell::Cell,
-        game::Game,
+        game::{Game, GameData},
     },
     view::ui::{ControlMessages, UserInterface},
 };
@@ -28,7 +28,7 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     info!("Starting rust of life!");
-    let (tx, rx) = tokio::sync::watch::channel::<Vec<Vec<Option<Cell>>>>(vec![]);
+    let (tx, rx) = tokio::sync::watch::channel::<GameData>(GameData::default());
     let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();

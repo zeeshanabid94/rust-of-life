@@ -7,13 +7,14 @@ use cursive::{
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
 
-use crate::state::cell::{Cell, CellState};
+use crate::state::{cell::{Cell, CellState}, game::GameData};
 
 const OFFSET_X: usize = 5;
 const OFFSET_Y: usize = 5;
 
 #[derive(Debug)]
 pub enum ControlMessages {
+    Reset,
     Start,
     Stop,
 }
@@ -29,7 +30,7 @@ pub struct UserInterface {
 
 impl UserInterface {
     pub fn init(
-        model_rx: Receiver<Vec<Vec<Option<Cell>>>>,
+        model_rx: Receiver<GameData>,
         controls_tx: Sender<ControlMessages>,
     ) -> Self {
         let canvas = BoxedView::boxed(PaddedView::lrtb(
@@ -48,12 +49,12 @@ impl UserInterface {
                         let board = rx.borrow();
 
                         tracing::debug!("Drawing board.");
-                        for cell in board.iter().flatten() {
+                        for cell in board.cells.iter().flatten() {
                             if let Some(inner) = cell.as_ref() { printer.print(
                                     (inner.x(), inner.y()),
                                     match inner.state {
-                                        CellState::Alive => "A",
-                                        CellState::Dead => " ",
+                                        CellState::Alive => "o",
+                                        CellState::Dead => "+",
                                     },
                                 ) }
                         }
@@ -111,11 +112,53 @@ impl UserInterface {
                             }
                         }
                     }
-                })
-                .with_name("Start/Stop")
-                .fixed_width(10),
-            )),
-        );
+                }
+
+                )))
+                .child(PaddedView::lrtb(
+                OFFSET_X,
+                OFFSET_X,
+                OFFSET_Y,
+                OFFSET_Y,
+                Button::new("Reset", {
+                    
+                    let cloned_tx = controls_tx.clone();
+                    move |_s| {
+                        tracing::info!("Reset button pressed.");
+                        if let Some(user_data) = _s.user_data::<UserInterfaceData>() {
+                            tracing::info!("Read user data {:?}", user_data);
+                            if user_data.running {
+                                if let Err(error) = cloned_tx.try_send(ControlMessages::Reset) {
+                                    tracing::error!(
+                                    "Unable to send reset message on controls sender channel. {:?}",
+                                    error
+                                );
+                                } else {
+                                    _s.set_user_data(UserInterfaceData { running: false });
+                                }
+                            } else if let Err(error) = cloned_tx.try_send(ControlMessages::Reset) {
+                                tracing::error!(
+                                "Unable to send reset message on controls sender channel. {:?}",
+                                error
+                            );
+                            } else {
+                                _s.set_user_data(UserInterfaceData { running: true });
+                            }
+                        } else if let Err(error) = cloned_tx.try_send(ControlMessages::Reset) {
+                            tracing::error!(
+                                "Unable to send reset message on controls sender channel. {:?}",
+                                error
+                            );
+                        } else {
+                            _s.set_user_data(UserInterfaceData { running: true });
+                        }
+                    }
+                }
+
+                )
+                .with_name("Reset")
+                .fixed_width(10)
+            )));
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 
         Self { root: layout }
