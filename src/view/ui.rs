@@ -40,7 +40,7 @@ impl UserInterface {
             OFFSET_Y,
             OFFSET_Y,
             Panel::new(
-                Canvas::new(RefCell::new(model_rx))
+                Canvas::new(RefCell::new(model_rx.clone()))
                     .with_required_size(|_state, _screen_size| {
                         // TODO: Figure out a better way to get size
                         cursive::Vec2::new(50, 30)
@@ -72,7 +72,12 @@ impl UserInterface {
                     OFFSET_X,
                     OFFSET_Y,
                     OFFSET_Y,
-                    Button::new("Start", UserInterface::start_button_callback(controls_tx.clone())),
+                    Button::new(
+                        "Start",
+                        UserInterface::start_button_callback(controls_tx.clone(), model_rx.clone()),
+                    )
+                    .with_name("Start/Stop")
+                    .fixed_width(10),
                 ))
                 .child(PaddedView::lrtb(
                     OFFSET_X,
@@ -91,47 +96,36 @@ impl UserInterface {
 
     fn start_button_callback(
         controls_tx: Sender<ControlMessages>,
+        model_rx: Receiver<GameData>,
     ) -> Box<dyn 'static + Fn(&mut Cursive)> {
         return {
             let cloned_tx = controls_tx.clone();
+            let cloned_rx = model_rx.clone();
             Box::new(move |_s: &mut Cursive| {
                 tracing::info!("Start/Stop button pressed.");
-                if let Some(user_data) = _s.user_data::<UserInterfaceData>() {
-                    tracing::info!("Read user data {:?}", user_data);
-                    if user_data.running {
-                        if let Err(error) = cloned_tx.try_send(ControlMessages::Stop) {
-                            tracing::error!(
-                                "Unable to send stop message on controls sender channel. {:?}",
-                                error
-                            );
-                        } else {
-                            _s.set_user_data(UserInterfaceData { running: false });
-                        }
-                    } else if let Err(error) = cloned_tx.try_send(ControlMessages::Start) {
+                let model_state = cloned_rx.borrow();
+                if model_state.running {
+                    if let Err(error) = cloned_tx.try_send(ControlMessages::Stop) {
+                        tracing::error!(
+                            "Unable to send stop message on controls sender channel. {:?}",
+                            error
+                        );
+                    } else {
+                        tracing::info!("Stop message sent. Changing Button Label to Start");
+                        _s.call_on_name("Start/Stop", |view: &mut Button| {
+                            view.set_label("Start");
+                        });
+                    }
+                } else {
+                    if let Err(error) = cloned_tx.try_send(ControlMessages::Start) {
                         tracing::error!(
                             "Unable to send start message on controls sender channel. {:?}",
                             error
                         );
                     } else {
-                        _s.set_user_data(UserInterfaceData { running: true });
-                    }
-                } else if let Err(error) = cloned_tx.try_send(ControlMessages::Start) {
-                    tracing::error!(
-                        "Unable to send start message on controls sender channel. {:?}",
-                        error
-                    );
-                } else {
-                    _s.set_user_data(UserInterfaceData { running: true });
-                }
-
-                if let Some(user_data) = _s.user_data::<UserInterfaceData>() {
-                    if user_data.running {
+                        tracing::info!("Start message sent. Changing Button Label to Stop.");
                         _s.call_on_name("Start/Stop", |view: &mut Button| {
                             view.set_label("Stop");
-                        });
-                    } else {
-                        _s.call_on_name("Start/Stop", |view: &mut Button| {
-                            view.set_label("Start");
                         });
                     }
                 }
