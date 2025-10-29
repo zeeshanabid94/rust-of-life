@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 10.0;
+const TICK_RATE_PER_SECOND: f64 = 1.0;
 type Board = Vec<Vec<Option<Cell>>>;
 
 #[derive(Debug, Clone, Default)]
@@ -155,12 +155,13 @@ impl Game {
                     }
                 }
 
+                debug!("Alive count for cell at x: {i} y: {j} is {alive_count}");
                 debug!("Updating cell state.");
 
                 if let CellState::Alive =
                     cell.as_ref().map_or(&CellState::Dead, |inner| &inner.state)
                 {
-                    if !(2..=3).contains(&alive_count) {
+                    if alive_count < 2 || alive_count > 3 {
                         cell.as_mut().map(|inner| inner.state = CellState::Dead);
                     }
                 } else if alive_count == 3 {

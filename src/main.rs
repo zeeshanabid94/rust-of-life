@@ -4,7 +4,6 @@ use cursive::{
 };
 use rust_of_life::{
     state::{
-        cell::Cell,
         game::{Game, GameData},
     },
     view::ui::{ControlMessages, UserInterface},
@@ -32,7 +31,7 @@ async fn main() {
     let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();
-    let game = Game::randomized_board(50, 30)
+    let game = Game::randomized_board(3, 3)
         .with_sender(tx)
         .with_control_rx(controls_rx);
 

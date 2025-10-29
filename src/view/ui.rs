@@ -7,9 +7,10 @@ use cursive::{
 };
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
+use tracing::{debug, info};
 
 use crate::state::{
-    cell::{Cell, CellState},
+    cell::CellState,
     game::GameData,
 };
 
@@ -87,7 +88,17 @@ impl UserInterface {
                     Button::new("Reset", UserInterface::reset_button_callback(controls_tx))
                         .with_name("Reset")
                         .fixed_width(10),
+                ))
+                .child(PaddedView::lrtb(
+                    OFFSET_X,
+                    OFFSET_X,
+                    OFFSET_Y,
+                    OFFSET_Y,
+                    Button::new("Print Board State", UserInterface::print_board_state_callback(model_rx.clone()))
+                        .with_name("Reset")
+                        .fixed_width(10),
                 )),
+
         );
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 
@@ -131,6 +142,19 @@ impl UserInterface {
                 }
             })
         };
+    }
+
+    fn print_board_state_callback(
+        model_rx: Receiver<GameData>
+    ) -> Box<dyn 'static + Fn(&mut Cursive)> {
+        return {
+            let cloned_rx = model_rx.clone();
+            Box::new(move |_s: &mut Cursive| {
+                tracing::info!("Print board state button pressed.");
+                let model_state = cloned_rx.borrow();
+                info!("Board state {model_state:?}")
+            })
+        }
     }
 
     fn reset_button_callback(
