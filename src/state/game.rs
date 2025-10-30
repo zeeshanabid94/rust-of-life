@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 1.0;
+const TICK_RATE_PER_SECOND: f64 = 50.0;
 type Board = Vec<Vec<Option<Cell>>>;
 
 #[derive(Debug, Clone, Default)]
@@ -114,6 +114,7 @@ impl Game {
                         ControlMessages::Stop => self.game_data.running = false,
                         ControlMessages::Start => self.game_data.running = true,
                         ControlMessages::Reset => self.reset(),
+                        ControlMessages::Step => self.tick(),
                     }
                 }
             }
@@ -134,8 +135,14 @@ impl Game {
                 let mut alive_count = 0;
                 for delta_i in -1_isize..=1 {
                     for delta_j in -1_isize..=1 {
+                        // Don't count the cell itself
+                        if delta_i == 0 && delta_j == 0 {
+                            continue;
+                        }
                         let neighbor_i = i as isize + delta_i;
                         let neighbor_j = j as isize + delta_j;
+
+
 
                         if neighbor_i < 0 || neighbor_i >= self.size_x {
                             debug!("X is out of bounds. X: {}", neighbor_i);

@@ -31,7 +31,7 @@ async fn main() {
     let (controls_tx, controls_rx) = tokio::sync::mpsc::channel::<ControlMessages>(100);
 
     let mut cursive_ref = Cursive::new();
-    let game = Game::randomized_board(3, 3)
+    let game = Game::randomized_board(64, 64)
         .with_sender(tx)
         .with_control_rx(controls_rx);
 
@@ -48,7 +48,7 @@ async fn main() {
     cursive_ref.add_global_callback('~', Cursive::toggle_debug_console);
     cursive_ref.add_global_callback('q', |cur_ref| cur_ref.quit());
     cursive_ref.set_autorefresh(true);
-    cursive_ref.set_fps(10);
+    cursive_ref.set_fps(60);
 
     cursive_ref.run();
 }
