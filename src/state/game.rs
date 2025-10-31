@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 50.0;
+const TICK_RATE_PER_SECOND: f64 = 15.0;
 type Board = Vec<Vec<Option<Cell>>>;
 
 #[derive(Debug, Clone, Default)]
