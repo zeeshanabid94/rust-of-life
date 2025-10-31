@@ -1,9 +1,7 @@
 use std::cell::RefCell;
 
 use cursive::{
-    view::{Nameable, Resizable},
-    views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel},
-    Cursive,
+    Cursive, event::Event, theme::ColorStyle, view::{Nameable, Resizable}, views::{BoxedView, Button, Canvas, LinearLayout, PaddedView, Panel}
 };
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
@@ -35,7 +33,7 @@ pub struct UserInterface {
 }
 
 impl UserInterface {
-    pub fn init(model_rx: Receiver<GameData>, controls_tx: Sender<ControlMessages>) -> Self {
+    pub fn init(model_rx: Receiver<GameData>, controls_tx: Sender<ControlMessages>, cursiveRef: &mut Cursive) -> Self {
         let canvas = BoxedView::boxed(PaddedView::lrtb(
             OFFSET_X,
             OFFSET_X,
@@ -50,16 +48,22 @@ impl UserInterface {
                     .with_draw(|state, printer| {
                         let rx = state.borrow_mut();
                         let board = rx.borrow();
-
+                        let previous_board = board.previousGeneration.clone().into_iter().flatten();
+                        let next_board = board.cells.clone().into_iter().flatten();
+                        let zipped_boards = next_board.zip(previous_board);
                         tracing::debug!("Drawing board.");
-                        for cell in board.cells.iter().flatten() {
-                            if let Some(inner) = cell.as_ref() {
+                        for (new_cell, old_cell) in zipped_boards {
+                            if let (Some(inner), Some(old_inner)) = (new_cell.as_ref(), old_cell.as_ref()) {
+                                let char_to_print = match (&inner.state, &old_inner.state) {
+                                    (CellState::Alive, CellState::Alive) => '█',
+                                    (CellState::Alive, CellState::Dead) => '▓',
+                                    (CellState::Dead, CellState::Alive) => '▒',
+                                    (CellState::Dead, CellState::Dead) => ' ',
+                                };
+                                
                                 printer.print(
                                     (inner.x(), inner.y()),
-                                    match inner.state {
-                                        CellState::Alive => "o",
-                                        CellState::Dead => "+",
-                                    },
+                                    &char_to_print.to_string()
                                 )
                             }
                         }
@@ -113,6 +117,15 @@ impl UserInterface {
         );
         let layout = BoxedView::boxed(LinearLayout::horizontal().child(canvas).child(controls));
 
+
+        let receiver_cloned = model_rx.clone();
+        cursiveRef.set_on_pre_event(Event::Refresh, move |cursive: &mut Cursive| {
+            let game_state = receiver_cloned.borrow();
+            cursive.call_on_name("Start/Stop", |view: &mut Button| {
+                view.set_label( if game_state.running { "Stop" } else { "Start" });
+            });
+        });
+
         Self { root: layout }
     }
 
@@ -124,7 +137,6 @@ impl UserInterface {
             let cloned_tx = controls_tx.clone();
             let cloned_rx = model_rx.clone();
             Box::new(move |_s: &mut Cursive| {
-                let user_inferface_data = _s.user_data::<UserInterfaceData>().cloned();
                 tracing::info!("Start/Stop button pressed.");
                 let model_state = cloned_rx.borrow();
                 if model_state.running {
@@ -142,9 +154,6 @@ impl UserInterface {
                         );
                     }
                 }
-                _s.call_on_name("Start/Stop", |view: &mut Button| {
-                    view.set_label(user_inferface_data.map_or("Unknown", |data| { if data.running { "Stop" } else { "Start" }}));
-                });
             })
         };
     }

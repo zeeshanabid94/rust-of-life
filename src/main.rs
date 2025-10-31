@@ -40,9 +40,9 @@ async fn main() {
         game.start().await;
     });
 
-    cursive_ref.add_layer(UserInterface::init(rx, controls_tx).root);
+    let user_interface = UserInterface::init(rx, controls_tx, &mut cursive_ref);
+    cursive_ref.add_layer(user_interface.root);
 
-    // cursive_ref.add_layer(GameRef(Rc::new(RefCell::new(game))));
     cursive_ref.set_window_title("Rust of Life");
 
     cursive_ref.add_global_callback('~', Cursive::toggle_debug_console);
