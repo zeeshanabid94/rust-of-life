@@ -8,14 +8,14 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch::Sender;
 use tracing::{debug, info};
 
-const TICK_RATE_PER_SECOND: f64 = 30.0;
+const TICK_RATE_PER_SECOND: f64 = 15.0;
 type Board = Vec<Vec<Option<Cell>>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct GameData {
     pub running: bool,
     pub cells: Board,
-    pub previousGeneration: Board
+    pub previous_generation: Board
 }
 
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl Game {
             game_data: Box::new(GameData {
                 running: false,
                 cells: cells.clone(),
-                previousGeneration: cells
+                previous_generation: cells
             })
         };
 
@@ -130,7 +130,7 @@ impl Game {
 
     fn tick(&mut self) {
         debug!("Ticking simulation.");
-        self.game_data.previousGeneration = self.game_data.cells.clone();
+        self.game_data.previous_generation = self.game_data.cells.clone();
         let cloned_cells = self.game_data.cells.clone();
 
         self.game_data.cells.iter_mut().enumerate().for_each(|(i, column)| {

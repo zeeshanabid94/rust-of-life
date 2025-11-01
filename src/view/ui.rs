@@ -33,7 +33,10 @@ pub struct UserInterface {
 }
 
 impl UserInterface {
-    pub fn init(model_rx: Receiver<GameData>, controls_tx: Sender<ControlMessages>, cursiveRef: &mut Cursive) -> Self {
+    pub fn init(model_rx: Receiver<GameData>, controls_tx: Sender<ControlMessages>, cursive_ref: &mut Cursive) -> Self {
+        let total_screen_size = cursive_ref.screen_size();
+        debug!("Total screen size: {:?}", total_screen_size);
+
         let canvas = BoxedView::boxed(PaddedView::lrtb(
             OFFSET_X,
             OFFSET_X,
@@ -48,7 +51,7 @@ impl UserInterface {
                     .with_draw(|state, printer| {
                         let rx = state.borrow_mut();
                         let board = rx.borrow();
-                        let previous_board = board.previousGeneration.clone().into_iter().flatten();
+                        let previous_board = board.previous_generation.clone().into_iter().flatten();
                         let next_board = board.cells.clone().into_iter().flatten();
                         let zipped_boards = next_board.zip(previous_board);
                         tracing::debug!("Drawing board.");
@@ -119,7 +122,7 @@ impl UserInterface {
 
 
         let receiver_cloned = model_rx.clone();
-        cursiveRef.set_on_pre_event(Event::Refresh, move |cursive: &mut Cursive| {
+        cursive_ref.set_on_pre_event(Event::Refresh, move |cursive: &mut Cursive| {
             let game_state = receiver_cloned.borrow();
             cursive.call_on_name("Start/Stop", |view: &mut Button| {
                 view.set_label( if game_state.running { "Stop" } else { "Start" });
